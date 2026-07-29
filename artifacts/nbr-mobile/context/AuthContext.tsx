@@ -5,6 +5,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Linking from 'expo-linking';
 import { supabase } from '@/lib/supabase';
 
 export interface NBRUser {
@@ -96,10 +97,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signUp(email: string, password: string, username: string) {
     setError(null);
     if (!supabase) throw new Error('Supabase not configured.');
+    // emailRedirectTo tells Supabase where to send the user after they click
+    // the confirmation link. Using Linking.createURL() gives the correct
+    // exp:// URL in Expo Go and the custom scheme in production builds.
+    const emailRedirectTo = Linking.createURL('auth/callback');
     const { error: err } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { username } },
+      options: { data: { username }, emailRedirectTo },
     });
     if (err) { setError(err.message); throw err; }
   }

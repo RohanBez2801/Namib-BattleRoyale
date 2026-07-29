@@ -18,7 +18,8 @@ function RootLayoutNav() {
     <Stack>
       <Stack.Screen name="index"       options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)"      options={{ headerShown: false }} />
-      <Stack.Screen name="auth"        options={{ headerShown: false }} />
+      <Stack.Screen name="auth"          options={{ headerShown: false }} />
+      <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
       <Stack.Screen name="(game)"      options={{ headerShown: false }} />
       <Stack.Screen name="matchmaking" options={{ headerShown: false, presentation: 'modal' }} />
       <Stack.Screen name="mode-select" options={{ headerShown: false }} />
