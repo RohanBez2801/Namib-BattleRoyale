@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable,
+  View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,41 +11,43 @@ import { StatBadge } from '@/components/StatBadge';
 import { BottomNav } from '@/components/BottomNav';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-interface RecentMatch {
-  placement: string;
-  kills: number;
-  mode: string;
-  duration: string;
-  map: string;
-  result: 'win' | 'loss' | 'top10';
+const ACHIEVEMENTS = [
+  { icon: 'sword',          label: 'First Blood',     desc: 'Get your first kill',          check: (s: ReturnType<typeof useGame>['playerStats']) => s.kills >= 1 },
+  { icon: 'trophy',         label: 'Champion',        desc: 'Win your first match',          check: (s: ReturnType<typeof useGame>['playerStats']) => s.wins >= 1 },
+  { icon: 'target',         label: 'Sharpshooter',    desc: '10 kills in a single match',    check: (_s: ReturnType<typeof useGame>['playerStats']) => false },
+  { icon: 'shield-check',   label: 'Survivor',        desc: 'Survive 10 minutes in a match', check: (s: ReturnType<typeof useGame>['playerStats']) => s.avgSurvivalMinutes >= 10 },
+  { icon: 'medal',          label: 'Top 10',           desc: 'Finish in the top 10',          check: (s: ReturnType<typeof useGame>['playerStats']) => s.topTen >= 1 },
+  { icon: 'run',            label: 'Veteran',          desc: 'Play 50 matches',               check: (s: ReturnType<typeof useGame>['playerStats']) => s.totalMatches >= 50 },
+];
+
+function formatMinutes(mins: number) {
+  const m = Math.floor(mins);
+  const s = Math.round((mins - m) * 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-const PLACEHOLDER_MATCHES: RecentMatch[] = [
-  { placement: '#1', kills: 0, mode: 'Solo', duration: '0:00', map: 'Desert Map', result: 'win' },
-];
-
-const ACHIEVEMENTS = [
-  { icon: 'sword',          label: 'First Blood',    desc: 'Get your first kill',    unlocked: false },
-  { icon: 'trophy',         label: 'Champion',       desc: 'Win your first match',   unlocked: false },
-  { icon: 'car',            label: 'Road Warrior',   desc: 'Travel 1km in a vehicle',unlocked: false },
-  { icon: 'target',         label: 'Sharpshooter',   desc: '5 kills with a sniper',  unlocked: false },
-  { icon: 'shield-check',   label: 'Survivor',       desc: 'Survive 10 minutes',     unlocked: false },
-  { icon: 'run',            label: 'Sprint Champion',desc: 'Sprint 500m in one match',unlocked: false },
-];
+function placementLabel(p: number) {
+  if (p === 1) return '#1 🏆';
+  if (p === 2) return '#2';
+  if (p === 3) return '#3';
+  return `#${p}`;
+}
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const { user } = useAuth();
-  const { playerStats } = useGame();
+  const { playerStats, recentMatches, isLoadingProfile, refreshProfile } = useGame();
 
   const kdRatio = playerStats.deaths === 0
     ? playerStats.kills.toFixed(1)
     : (playerStats.kills / playerStats.deaths).toFixed(2);
 
   const winRate = playerStats.totalMatches === 0
-    ? '0.0'
-    : ((playerStats.wins / playerStats.totalMatches) * 100).toFixed(1);
+    ? '0.0%'
+    : `${((playerStats.wins / playerStats.totalMatches) * 100).toFixed(1)}%`;
+
+  const xpPct = Math.min(playerStats.xp / playerStats.xpToNextLevel, 1);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -63,7 +65,15 @@ export default function ProfileScreen() {
             </LinearGradient>
 
             <View style={styles.heroInfo}>
-              <Text style={[styles.heroName, { color: colors.foreground }]}>{user?.username ?? 'Recruit'}</Text>
+              <View style={styles.heroNameRow}>
+                <Text style={[styles.heroName, { color: colors.foreground }]}>{user?.username ?? 'Recruit'}</Text>
+                <Pressable onPress={refreshProfile} style={styles.refreshBtn}>
+                  {isLoadingProfile
+                    ? <ActivityIndicator size="small" color={colors.mutedForeground} />
+                    : <MaterialCommunityIcons name="refresh" size={16} color={colors.mutedForeground} />
+                  }
+                </Pressable>
+              </View>
               <View style={styles.heroMeta}>
                 {user?.isGuest && (
                   <View style={[styles.heroBadge, { backgroundColor: 'rgba(139,152,184,0.15)', borderColor: colors.border }]}>
@@ -75,21 +85,23 @@ export default function ProfileScreen() {
                   <Text style={[styles.heroBadgeText, { color: '#F5A623' }]}>Lv. {playerStats.level}</Text>
                 </View>
                 <View style={[styles.heroBadge, { backgroundColor: 'rgba(34,197,94,0.15)', borderColor: 'rgba(34,197,94,0.3)' }]}>
-                  <Text style={[styles.heroBadgeText, { color: '#22C55E' }]}>Recruit Rank</Text>
+                  <Text style={[styles.heroBadgeText, { color: '#22C55E' }]}>
+                    {playerStats.totalMatches < 10 ? 'Recruit' : playerStats.wins < 5 ? 'Soldier' : 'Veteran'}
+                  </Text>
                 </View>
               </View>
 
               {/* XP bar */}
               <View style={styles.xpRow}>
-                <View style={[styles.xpTrack, { backgroundColor: colors.border }]}>
+                <View style={[styles.xpTrack, { backgroundColor: colors.muted }]}>
                   <LinearGradient
-                    colors={['#FF6B1A', '#F5A623']}
+                    colors={['#FF8C4A', '#FF6B1A']}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                    style={[styles.xpFill, { width: `${(playerStats.xp / playerStats.xpToNextLevel) * 100}%` as any }]}
+                    style={[styles.xpFill, { width: `${xpPct * 100}%` as `${number}%` }]}
                   />
                 </View>
                 <Text style={[styles.xpText, { color: colors.mutedForeground }]}>
-                  {playerStats.xp}/{playerStats.xpToNextLevel}
+                  {playerStats.xp}/{playerStats.xpToNextLevel} XP
                 </Text>
               </View>
             </View>
@@ -97,14 +109,14 @@ export default function ProfileScreen() {
 
           {/* Currency row */}
           <View style={styles.currencyRow}>
-            <View style={[styles.currencyChip, { backgroundColor: 'rgba(245,166,35,0.12)', borderColor: 'rgba(245,166,35,0.25)' }]}>
-              <MaterialCommunityIcons name="gold" size={14} color="#F5A623" />
-              <Text style={[styles.currencyVal, { color: '#F5A623' }]}>{playerStats.coins.toLocaleString()}</Text>
+            <View style={[styles.currencyChip, { backgroundColor: 'rgba(255,198,0,0.08)', borderColor: 'rgba(255,198,0,0.2)' }]}>
+              <MaterialCommunityIcons name="bitcoin" size={18} color="#FFC600" />
+              <Text style={[styles.currencyVal, { color: colors.foreground }]}>{playerStats.coins.toLocaleString()}</Text>
               <Text style={[styles.currencyLbl, { color: colors.mutedForeground }]}>Coins</Text>
             </View>
-            <View style={[styles.currencyChip, { backgroundColor: 'rgba(59,130,246,0.12)', borderColor: 'rgba(59,130,246,0.25)' }]}>
-              <MaterialCommunityIcons name="diamond-stone" size={14} color="#3B82F6" />
-              <Text style={[styles.currencyVal, { color: '#3B82F6' }]}>{playerStats.premiumCurrency}</Text>
+            <View style={[styles.currencyChip, { backgroundColor: 'rgba(139,92,246,0.08)', borderColor: 'rgba(139,92,246,0.2)' }]}>
+              <MaterialCommunityIcons name="diamond-stone" size={18} color="#8B5CF6" />
+              <Text style={[styles.currencyVal, { color: colors.foreground }]}>{playerStats.premiumCurrency.toLocaleString()}</Text>
               <Text style={[styles.currencyLbl, { color: colors.mutedForeground }]}>Gems</Text>
             </View>
           </View>
@@ -114,69 +126,113 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>COMBAT STATS</Text>
           <View style={styles.statsRow}>
-            <StatBadge label="K/D Ratio" value={kdRatio} accent />
-            <StatBadge label="Kills" value={playerStats.kills} />
-            <StatBadge label="Deaths" value={playerStats.deaths} />
+            <StatBadge label="Matches"  value={String(playerStats.totalMatches)} />
+            <StatBadge label="Wins"     value={String(playerStats.wins)} accent />
+            <StatBadge label="Win Rate" value={winRate} />
           </View>
           <View style={styles.statsRow}>
-            <StatBadge label="Matches" value={playerStats.totalMatches} />
-            <StatBadge label="Wins" value={playerStats.wins} accent />
-            <StatBadge label="Win Rate" value={`${winRate}%`} />
+            <StatBadge label="Kills"    value={String(playerStats.kills)} />
+            <StatBadge label="K/D"      value={kdRatio} />
+            <StatBadge label="Top 10"   value={String(playerStats.topTen)} />
           </View>
           <View style={styles.statsRow}>
-            <StatBadge label="Top 10" value={playerStats.topTen} />
-            <StatBadge label="Best Place" value={playerStats.bestPlacement === 0 ? '—' : `#${playerStats.bestPlacement}`} />
-            <StatBadge label="Avg Survive" value={`${playerStats.avgSurvivalMinutes}m`} />
+            <StatBadge label="Best"     value={playerStats.bestPlacement > 0 ? `#${playerStats.bestPlacement}` : '—'} />
+            <StatBadge label="Avg Time" value={playerStats.avgSurvivalMinutes > 0 ? formatMinutes(playerStats.avgSurvivalMinutes) : '—'} />
+            <StatBadge label="Level"    value={String(playerStats.level)} accent />
           </View>
         </View>
 
         {/* Recent matches */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>RECENT MATCHES</Text>
-          {playerStats.totalMatches === 0 ? (
-            <View style={[styles.emptyBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <MaterialCommunityIcons name="map-search-outline" size={32} color={colors.mutedForeground} />
+          <View style={styles.sectionRow}>
+            <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>RECENT MATCHES</Text>
+            <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>
+              {recentMatches.length} shown
+            </Text>
+          </View>
+
+          {recentMatches.length === 0 ? (
+            <View style={[styles.emptyBox, { borderColor: colors.border, backgroundColor: colors.card }]}>
+              <MaterialCommunityIcons name="controller-off" size={32} color={colors.mutedForeground} />
               <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No matches yet</Text>
               <Text style={[styles.emptySub, { color: colors.mutedForeground }]}>
-                Play your first match to start building your history
+                Play your first match to see your history here
               </Text>
             </View>
-          ) : null}
+          ) : (
+            recentMatches.map((m) => {
+              const isWin = m.placement === 1;
+              const isTop10 = m.placement <= 10;
+              const resultColor = isWin ? '#22C55E' : isTop10 ? '#F5A623' : colors.mutedForeground;
+              return (
+                <View key={m.id} style={[styles.matchRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={[styles.matchPlacement, { backgroundColor: isWin ? 'rgba(34,197,94,0.15)' : 'rgba(139,152,184,0.1)' }]}>
+                    <Text style={[styles.matchPlacementText, { color: resultColor }]}>
+                      {placementLabel(m.placement)}
+                    </Text>
+                  </View>
+                  <View style={styles.matchInfo}>
+                    <Text style={[styles.matchMode, { color: colors.foreground }]}>
+                      {m.mode.charAt(0).toUpperCase() + m.mode.slice(1)}
+                    </Text>
+                    <Text style={[styles.matchMeta, { color: colors.mutedForeground }]}>
+                      {formatMinutes(m.survivalMinutes)} • {new Date(m.playedAt).toLocaleDateString()}
+                    </Text>
+                  </View>
+                  <View style={styles.matchStats}>
+                    <Text style={[styles.matchKills, { color: colors.foreground }]}>
+                      <MaterialCommunityIcons name="skull" size={11} color={colors.mutedForeground} /> {m.kills}
+                    </Text>
+                    <Text style={[styles.matchXp, { color: '#F5A623' }]}>+{m.xpEarned} XP</Text>
+                  </View>
+                </View>
+              );
+            })
+          )}
         </View>
 
         {/* Achievements */}
         <View style={styles.section}>
-          <View style={styles.sectionRow}>
-            <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>ACHIEVEMENTS</Text>
-            <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>0 / {ACHIEVEMENTS.length}</Text>
-          </View>
-          {ACHIEVEMENTS.map(a => (
-            <View
-              key={a.label}
-              style={[styles.achieveRow, { backgroundColor: colors.card, borderColor: colors.border, opacity: a.unlocked ? 1 : 0.6 }]}
-            >
-              <View style={[styles.achieveIcon, { backgroundColor: a.unlocked ? 'rgba(255,107,26,0.15)' : 'rgba(139,152,184,0.1)' }]}>
-                <MaterialCommunityIcons
-                  name={a.icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']}
-                  size={22}
-                  color={a.unlocked ? '#FF6B1A' : colors.mutedForeground}
-                />
+          <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>ACHIEVEMENTS</Text>
+          {ACHIEVEMENTS.map((a) => {
+            const unlocked = a.check(playerStats);
+            return (
+              <View
+                key={a.label}
+                style={[
+                  styles.achieveRow,
+                  {
+                    backgroundColor: unlocked ? 'rgba(245,166,35,0.06)' : colors.card,
+                    borderColor: unlocked ? 'rgba(245,166,35,0.25)' : colors.border,
+                  },
+                ]}
+              >
+                <View style={[
+                  styles.achieveIcon,
+                  { backgroundColor: unlocked ? 'rgba(245,166,35,0.15)' : colors.muted },
+                ]}>
+                  <MaterialCommunityIcons
+                    name={a.icon as never}
+                    size={20}
+                    color={unlocked ? '#F5A623' : colors.mutedForeground}
+                  />
+                </View>
+                <View style={styles.achieveText}>
+                  <Text style={[styles.achieveName, { color: unlocked ? colors.foreground : colors.mutedForeground }]}>
+                    {a.label}
+                  </Text>
+                  <Text style={[styles.achieveDesc, { color: colors.mutedForeground }]}>{a.desc}</Text>
+                </View>
+                {unlocked && (
+                  <MaterialCommunityIcons name="check-circle" size={18} color="#22C55E" />
+                )}
               </View>
-              <View style={styles.achieveText}>
-                <Text style={[styles.achieveName, { color: colors.foreground }]}>{a.label}</Text>
-                <Text style={[styles.achieveDesc, { color: colors.mutedForeground }]}>{a.desc}</Text>
-              </View>
-              <MaterialCommunityIcons
-                name={a.unlocked ? 'check-circle' : 'lock-outline'}
-                size={18}
-                color={a.unlocked ? '#22C55E' : colors.mutedForeground}
-              />
-            </View>
-          ))}
+            );
+          })}
         </View>
       </ScrollView>
 
-      <BottomNav active="profile" insetBottom={insets.bottom} />
+      <BottomNav active="profile" />
     </View>
   );
 }
@@ -189,7 +245,9 @@ const styles = StyleSheet.create({
   heroAvatar: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   heroAvatarText: { fontSize: 28, fontWeight: '900', color: '#FFFFFF' },
   heroInfo: { flex: 1, gap: 6 },
-  heroName: { fontSize: 20, fontWeight: '800' },
+  heroNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  heroName: { fontSize: 20, fontWeight: '800', flex: 1 },
+  refreshBtn: { padding: 4 },
   heroMeta: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   heroBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
@@ -199,7 +257,7 @@ const styles = StyleSheet.create({
   xpRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   xpTrack: { flex: 1, height: 4, borderRadius: 2, overflow: 'hidden' },
   xpFill: { height: '100%', borderRadius: 2 },
-  xpText: { fontSize: 9, width: 52, textAlign: 'right' },
+  xpText: { fontSize: 9, width: 72, textAlign: 'right' },
 
   currencyRow: { flexDirection: 'row', gap: 10 },
   currencyChip: {
@@ -213,7 +271,6 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1.5 },
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sectionCount: { fontSize: 11 },
-
   statsRow: { flexDirection: 'row', gap: 10 },
 
   emptyBox: {
@@ -222,6 +279,22 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 15, fontWeight: '700' },
   emptySub: { fontSize: 13, textAlign: 'center', lineHeight: 18 },
+
+  matchRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    padding: 12, borderRadius: 12, borderWidth: 1,
+  },
+  matchPlacement: {
+    width: 52, height: 40, borderRadius: 8,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  matchPlacementText: { fontSize: 13, fontWeight: '800' },
+  matchInfo: { flex: 1 },
+  matchMode: { fontSize: 14, fontWeight: '700' },
+  matchMeta: { fontSize: 11, marginTop: 2 },
+  matchStats: { alignItems: 'flex-end', gap: 4 },
+  matchKills: { fontSize: 13, fontWeight: '700' },
+  matchXp: { fontSize: 11, fontWeight: '600' },
 
   achieveRow: {
     flexDirection: 'row', alignItems: 'center', gap: 14,

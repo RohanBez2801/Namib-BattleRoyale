@@ -1,0 +1,3 @@
+- [NBR font loading](nbr-font-loading.md) — never use @expo-google-fonts in NBR; fontfaceobserver CDN timeout crashes the app on device.
+- [NBR API routing](nbr-api-routing.md) — API server is at /api on the same Replit dev domain (not /api-server/api).
+- [NBR milestone state](nbr-milestone-state.md) — M1 app shell + M2 DB/API complete; what's done, what's next.
