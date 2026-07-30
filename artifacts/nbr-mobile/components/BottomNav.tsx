@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Pressable, StyleSheet, Text, Platform } from 'react-native';
-import { router } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import * as Haptics from 'expo-haptics';
@@ -11,34 +11,30 @@ interface NavItem {
   key: NavTab;
   icon: string;
   label: string;
-  route: string;
+  route: any; // Using any to bypass strict route typing during dev
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { key: 'lobby',     icon: 'crosshairs-gps', label: 'Lobby',     route: '/(game)/lobby' },
-  { key: 'character', icon: 'account-star',   label: 'Character', route: '/(game)/character' },
-  { key: 'store',     icon: 'storefront',     label: 'Store',     route: '/(game)/store' },
-  { key: 'profile',   icon: 'chart-bar',      label: 'Stats',     route: '/(game)/profile' },
-  { key: 'settings',  icon: 'cog',            label: 'Settings',  route: '/(game)/settings' },
+  { key: 'lobby',     icon: 'crosshairs-gps', label: 'Lobby',     route: '/lobby' },
+  { key: 'character', icon: 'account-star',   label: 'Character', route: '/character' },
+  { key: 'store',     icon: 'storefront',     label: 'Store',     route: '/store' },
+  { key: 'profile',   icon: 'chart-bar',      label: 'Stats',     route: '/profile' },
+  { key: 'settings',  icon: 'cog',            label: 'Settings',  route: '/settings' },
 ];
 
-interface BottomNavProps {
-  active: NavTab;
-  insetBottom: number;
-}
-
-export function BottomNav({ active, insetBottom }: BottomNavProps) {
+export function BottomNav({ active, insetBottom }: { active: NavTab; insetBottom?: number }) {
   const colors = useColors();
-  const bottomPad = Math.max(insetBottom, Platform.OS === 'web' ? 34 : 6);
+  const router = useRouter();
+  const bottomPad = Math.max(insetBottom || 0, Platform.OS === 'web' ? 34 : 10);
 
   function go(item: NavItem) {
     if (item.key === active) return;
-    Haptics.selectionAsync();
-    router.replace(item.route as Parameters<typeof router.replace>[0]);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.replace(item.route);
   }
 
   return (
-    <View style={[styles.container, { paddingBottom: bottomPad, backgroundColor: 'rgba(6,8,15,0.94)', borderTopColor: colors.border }]}>
+    <View style={[styles.container, { paddingBottom: bottomPad, backgroundColor: '#06080F', borderTopColor: colors.border }]}>
       {NAV_ITEMS.map((item) => {
         const isActive = item.key === active;
         return (
@@ -46,11 +42,12 @@ export function BottomNav({ active, insetBottom }: BottomNavProps) {
             key={item.key}
             onPress={() => go(item)}
             style={({ pressed }) => [styles.item, { opacity: pressed ? 0.7 : 1 }]}
+            hitSlop={15}
           >
             <View style={[styles.iconWrap, isActive && { backgroundColor: 'rgba(255,107,26,0.15)', borderRadius: 10 }]}>
               <MaterialCommunityIcons
-                name={item.icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']}
-                size={22}
+                name={item.icon as any}
+                size={24}
                 color={isActive ? '#FF6B1A' : colors.mutedForeground}
               />
             </View>
@@ -67,11 +64,9 @@ export function BottomNav({ active, insetBottom }: BottomNavProps) {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    flexDirection: 'row',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: 6,
+    flexDirection: 'row', borderTopWidth: 1, paddingTop: 8, zIndex: 999
   },
   item: { flex: 1, alignItems: 'center', gap: 2 },
-  iconWrap: { padding: 5 },
-  label: { fontSize: 10, fontWeight: '600' },
+  iconWrap: { padding: 6 },
+  label: { fontSize: 10, fontWeight: '700' },
 });
