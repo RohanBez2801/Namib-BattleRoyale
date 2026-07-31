@@ -1,4 +1,5 @@
-Namib Battle Royale (NBR)
+#Namib Battle Royale (NBR)#
+
 Namibia's Arena. Your Legend.
 Namib Battle Royale is a commercial-quality, mobile-first multiplayer experience developed in TypeScript. The game celebrates Namibia’s iconic landscapes—from the towering dunes of Sossusvlei to the rusted shipwrecks of the Skeleton Coast—providing a high-fidelity competitive arena for a global audience.
 🚀 Project Status: Milestone 4 Complete
