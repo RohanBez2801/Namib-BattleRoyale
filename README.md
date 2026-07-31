@@ -1,4 +1,3 @@
---- START OF FILE README.md ---
 Namib Battle Royale (NBR)
 Namibia's Arena. Your Legend.
 Namib Battle Royale is a commercial-quality, mobile-first multiplayer experience developed in TypeScript. The game celebrates Namibia’s iconic landscapes—from the towering dunes of Sossusvlei to the rusted shipwrecks of the Skeleton Coast—providing a high-fidelity competitive arena for a global audience.
@@ -38,4 +37,3 @@ Powershell
 cd artifacts/nbr-mobile
 npx expo start --lan
 Scan the QR code with Expo Go on your device (Ensure same Wi-Fi).
---- END OF FILE ---
