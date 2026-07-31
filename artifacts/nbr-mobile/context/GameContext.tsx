@@ -47,6 +47,7 @@ export interface GameContextValue {
     coinsEarned?: number;
     xpEarned?: number;
   }) => Promise<void>;
+  socketRef: React.MutableRefObject<any>;
 }
 
 const DEFAULT_STATS: PlayerStats = {
@@ -87,12 +88,14 @@ function profileToStats(p: NBRProfile, s: NBRPlayerStats | null): PlayerStats {
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const [selectedMode, setSelectedMode] = useState<MatchMode>('solo');
+  const socketRef = React.useRef<any>(null);
+  const [selectedMode, setSelectedMode] = React.useState<MatchMode>('solo');
   const [playerStats, setPlayerStats] = useState<PlayerStats>(DEFAULT_STATS);
   const [recentMatches, setRecentMatches] = useState<NBRMatchHistory[]>([]);
   const [isInMatchmaking, setIsInMatchmaking] = useState(false);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+
 
   const getIdentity = useCallback(async (id?: string | null) => {
     const pid = id ?? profileId;
@@ -165,6 +168,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       isLoadingProfile,
       refreshProfile,
       recordMatchResult,
+      socketRef,
     }}>
       {children}
     </GameContext.Provider>

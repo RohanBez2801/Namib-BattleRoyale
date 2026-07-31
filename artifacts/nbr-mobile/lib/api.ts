@@ -7,11 +7,7 @@
 
 // API server is routed at /api on the same Replit dev domain.
 // In production it maps to the same autoscale deployment.
-const BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL ??
-  (process.env.EXPO_PUBLIC_DOMAIN
-    ? `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`
-    : "http://localhost:8080/api");
+const BASE_URL = "http://192.168.0.110:5000/api";
 
 export interface NBRProfile {
   id: string;

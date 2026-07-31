@@ -1,53 +1,38 @@
-import React, { useEffect } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { KeyboardProvider } from 'react-native-keyboard-controller';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
+import React, { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider } from '@/context/AuthContext';
 import { GameProvider } from '@/context/GameContext';
 
-SplashScreen.preventAutoHideAsync();
-
-const queryClient = new QueryClient();
-
-function RootLayoutNav() {
-  return (
-    <Stack>
-      <Stack.Screen name="index"       options={{ headerShown: false }} />
-      <Stack.Screen name="(tabs)"      options={{ headerShown: false }} />
-      <Stack.Screen name="auth"          options={{ headerShown: false }} />
-      <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
-      <Stack.Screen name="(game)"      options={{ headerShown: false }} />
-      <Stack.Screen name="matchmaking" options={{ headerShown: false, presentation: 'modal' }} />
-      <Stack.Screen name="mode-select" options={{ headerShown: false }} />
-      <Stack.Screen name="+not-found"  options={{ title: 'Not Found' }} />
-    </Stack>
-  );
-}
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
+  const [isReady, setIsReady] = useState(false);
   useEffect(() => {
-    SplashScreen.hideAsync();
+    const timer = setTimeout(() => setIsReady(true), 500);
+    return () => clearTimeout(timer);
   }, []);
-
+  useEffect(() => {
+    if (isReady) { SplashScreen.hideAsync().catch(() => {}); }
+  }, [isReady]);
+  if (!isReady) return null;
   return (
-    <SafeAreaProvider>
-      <ErrorBoundary>
-        <AuthProvider>
-          <GameProvider>
-            <QueryClientProvider client={queryClient}>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <KeyboardProvider>
-                  <RootLayoutNav />
-                </KeyboardProvider>
-              </GestureHandlerRootView>
-            </QueryClientProvider>
-          </GameProvider>
-        </AuthProvider>
-      </ErrorBoundary>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <KeyboardProvider>
+          <AuthProvider>
+            <GameProvider>
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="index" />
+                <Stack.Screen name="(game)" />
+              </Stack>
+            </GameProvider>
+          </AuthProvider>
+        </KeyboardProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

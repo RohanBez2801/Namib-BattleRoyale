@@ -67,14 +67,28 @@ export default function MatchmakingScreen() {
   }, []);
 
   // Simulate players joining
-  useEffect(() => {
+    useEffect(() => {
     const interval = setInterval(() => {
       setPlayerCount(c => {
-        const next = c + Math.floor(Math.random() * 3);
-        return Math.min(next, target);
+        const next = c + Math.floor(Math.random() * 4) + 1; // Faster joining
+        
+        // --- MATCH FOUND LOGIC ---
+        if (next >= target) {
+          clearInterval(interval);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          
+          // Wait 1.5 seconds so the player sees "20/20", then DEPLOY
+          setTimeout(() => {
+            router.replace('/(game)/arena');
+          }, 1500);
+          
+          return target;
+        }
+        return next;
       });
       setElapsed(e => e + 1);
-    }, 1200);
+    }, 1000);
+    
     return () => clearInterval(interval);
   }, [target]);
 
