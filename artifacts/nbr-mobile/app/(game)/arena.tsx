@@ -1,108 +1,196 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { View, StyleSheet, Dimensions, Text, StatusBar } from 'react-native';
+import { View, StyleSheet, Dimensions, Text, StatusBar, Pressable } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { useGame } from '@/context/GameContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
 const { width, height } = Dimensions.get('window');
 const MAP_SIZE = 5000;
-const MINIMAP_SIZE = 110;
+const MINIMAP_SIZE = 120;
 
 export default function ArenaScreen() {
   const { socketRef } = useGame();
+
+  // Player World Position
   const worldX = useSharedValue(2500);
   const worldY = useSharedValue(2500);
+  const offsetX = useSharedValue(2500);
+  const offsetY = useSharedValue(2500);
+
   const [gameState, setGameState] = useState<any>(null);
+  const [inventory, setInventory] = useState<any[]>([]);
+  const [nearbyLoot, setNearbyLoot] = useState<any>(null);
 
   useEffect(() => {
-    socketRef?.current?.emit('enter_arena', { username: 'Rohan' });
-    socketRef?.current?.on('world_update', (state: any) => setGameState(state));
-    return () => { socketRef?.current?.off('world_update'); };
+    const socket = socketRef?.current;
+    if (!socket) return;
+
+    socket.emit('enter_arena', { username: 'Rohan' });
+
+    socket.on('world_update', (state: any) => {
+      setGameState(state);
+      // Check if player is standing near any loot
+      if (state.loot) {
+        const items = Object.values(state.loot);
+        const closest = items.find((p: any) => {
+          const dist = Math.sqrt(Math.pow(p.x - worldX.value, 2) + Math.pow(p.y - worldY.value, 2));
+          return dist < 120; // 120 pixel pickup radius
+        });
+        setNearbyLoot(closest || null);
+      }
+    });
+
+    socket.on('item_added', (item: any) => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setInventory(prev => [...prev, item]);
+    });
+
+    return () => {
+      socket.off('world_update');
+      socket.off('item_added');
+    };
   }, [socketRef]);
 
-  const gesture = Gesture.Pan().onUpdate((e: any) => {
-    worldX.value = Math.max(0, Math.min(MAP_SIZE, worldX.value + e.changeX * -1.8));
-    worldY.value = Math.max(0, Math.min(MAP_SIZE, worldY.value + e.changeY * -1.8));
-    socketRef?.current?.emit('player_move', { x: worldX.value, y: worldY.value });
-  });
+  const gesture = Gesture.Pan()
+    .onBegin(() => {
+      offsetX.value = worldX.value;
+      offsetY.value = worldY.value;
+    })
+    .onUpdate((e: any) => {
+      worldX.value = Math.max(0, Math.min(MAP_SIZE, offsetX.value + (e.translationX * -1.8)));
+      worldY.value = Math.max(0, Math.min(MAP_SIZE, offsetY.value + (e.translationY * -1.8)));
+      socketRef?.current?.emit('player_move', { x: worldX.value, y: worldY.value });
+    });
 
-  // FIXED: Explicit transform objects to clear the TypeScript error
+  // FIXED: Explicit casting to 'any' to satisfy the strict Transform Union type
   const mapStyle = useAnimatedStyle(() => {
     return {
       transform: [
-        { translateX: -worldX.value + width / 2 },
-        { translateY: -worldY.value + height / 2 },
-      ] as const,
+        { translateX: (-worldX.value + width / 2) },
+        { translateY: (-worldY.value + height / 2) },
+      ] as any,
     };
   });
 
   const miniPlayerStyle = useAnimatedStyle(() => {
     return {
-      left: (worldX.value / MAP_SIZE) * MINIMAP_SIZE - 2,
-      top: (worldY.value / MAP_SIZE) * MINIMAP_SIZE - 2,
-    };
+      left: (worldX.value / MAP_SIZE) * MINIMAP_SIZE - 4,
+      top: (worldY.value / MAP_SIZE) * MINIMAP_SIZE - 4,
+    } as any;
   });
+
+  const handlePickup = () => {
+    if (nearbyLoot) {
+      socketRef?.current?.emit('pickup_loot', nearbyLoot.id);
+      setNearbyLoot(null);
+    }
+  };
 
   return (
     <View style={styles.container}>
       <StatusBar hidden />
-      
+
+      {/* 1. WORLD LAYER */}
       <Animated.View style={[styles.world, mapStyle]}>
-        <View style={styles.sandBase} />
-        
-        {/* Landmarks */}
-        <View style={[styles.landmark, { left: 2600, top: 2400 }]}>
-          <MaterialCommunityIcons name="terrain" size={50} color="orange" />
-          <Text style={styles.landmarkText}>Dune 45</Text>
-        </View>
-        
-        {/* Storm Circle */}
-        {gameState && (
-          <View style={[styles.storm, {
-            left: gameState.storm.x - gameState.storm.radius,
-            top: gameState.storm.y - gameState.storm.radius,
-            width: gameState.storm.radius * 2,
-            height: gameState.storm.radius * 2,
-            borderRadius: gameState.storm.radius,
-          }]} />
-        )}
+        <View style={styles.sandFloor}><GridLines /></View>
+
+        {/* Render Loot Drops from Server */}
+        {gameState?.loot && Object.entries(gameState.loot).map(([id, l]: any) => (
+          <View key={id} style={[styles.loot, { left: l.x, top: l.y }]}>
+            <MaterialCommunityIcons
+              name={l.type === 'weapon' ? "pistol" : "shield-account"}
+              size={30}
+              color="#FFF"
+            />
+          </View>
+        ))}
+
+        <Landmark x={2600} y={2400} name="DUNE 45" icon="terrain" color="#CC4D0E" />
+        <Landmark x={1500} y={1500} name="SHIPWRECK" icon="ship-wheel" color="#7F8C8D" />
       </Animated.View>
 
-      {/* PLAYER CENTERED */}
-      <View style={styles.player}>
-        <MaterialCommunityIcons name="navigation" size={35} color="#FF6B1A" />
+      {/* 2. PLAYER (Fixed Center) */}
+      <View style={styles.playerWrapper}>
+        <MaterialCommunityIcons name="navigation" size={36} color="#000" />
       </View>
 
-      {/* HUD Layer */}
-      <View style={styles.hudContainer} pointerEvents="none">
+      {/* 3. HUD LAYER */}
+      <View style={styles.hud} pointerEvents="box-none">
         <View style={styles.minimap}>
-           <Animated.View style={[styles.miniPlayer, miniPlayerStyle]} />
+          <View style={styles.minimapBg} />
+          <Animated.View style={[styles.miniDot, miniPlayerStyle]} />
         </View>
-        <View style={styles.healthBar}>
-           <View style={styles.healthFill} />
+
+        {/* Action Button: Pickup */}
+        {nearbyLoot ? (
+          <Pressable style={styles.pickupBtn} onPress={handlePickup}>
+            <MaterialCommunityIcons name="hand-pointing-up" size={24} color="#FFF" />
+            <Text style={styles.pickupText}>EQUIP {nearbyLoot.name.toUpperCase()}</Text>
+          </Pressable>
+        ) : null}
+
+        {/* Inventory Slots */}
+        <View style={styles.inventoryBar}>
+          {inventory.map((item, i) => (
+            <View key={i} style={styles.invSlot}>
+              <MaterialCommunityIcons
+                name={item.type === 'weapon' ? "pistol" : "shield-account"}
+                size={20}
+                color="#FF6B1A"
+              />
+            </View>
+          ))}
+          {/* Placeholder slots to keep layout consistent */}
+          {[...Array(Math.max(0, 3 - inventory.length))].map((_, i) => (
+            <View key={`empty-${i}`} style={styles.invSlot} />
+          ))}
         </View>
       </View>
 
       <GestureDetector gesture={gesture}>
-        <View style={StyleSheet.absoluteFill}/>
+        <View style={StyleSheet.absoluteFill} />
       </GestureDetector>
     </View>
   );
 }
 
+function GridLines() {
+  const lines = [];
+  for (let i = 0; i <= MAP_SIZE; i += 500) {
+    lines.push(<View key={`v-${i}`} style={[styles.gridV, { left: i }]} />);
+    lines.push(<View key={`h-${i}`} style={[styles.gridH, { top: i }]} />);
+  }
+  return <>{lines}</>;
+}
+
+function Landmark({ x, y, name, icon, color }: any) {
+  return (
+    <View style={[styles.landmark, { left: x, top: y }]}>
+      <MaterialCommunityIcons name={icon} size={50} color={color} />
+      <Text style={styles.landmarkText}>{name}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
+  container: { flex: 1, backgroundColor: '#06080F' },
   world: { width: MAP_SIZE, height: MAP_SIZE, position: 'absolute' },
-  sandBase: { ...StyleSheet.absoluteFillObject, backgroundColor: '#120A04', borderWidth: 2, borderColor: '#1e1e1e' },
-  player: { position: 'absolute', left: width/2 - 17, top: height/2 - 17, zIndex: 10, alignItems: 'center' },
-  hudContainer: { ...StyleSheet.absoluteFillObject, zIndex: 999, padding: 30, alignItems: 'flex-end' },
-  minimap: { width: MINIMAP_SIZE, height: MINIMAP_SIZE, backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 10, borderWidth: 1, borderColor: '#444', overflow: 'hidden' },
-  miniPlayer: { position: 'absolute', width: 4, height: 4, backgroundColor: '#FF6B1A', borderRadius: 2 },
-  healthBar: { width: 200, height: 10, backgroundColor: '#333', borderRadius: 5, position: 'absolute', bottom: 50, alignSelf: 'center', overflow: 'hidden' },
-  healthFill: { width: '100%', height: '100%', backgroundColor: '#EF4444' },
+  sandFloor: { ...StyleSheet.absoluteFillObject, backgroundColor: '#E87722', borderWidth: 2, borderColor: '#333' },
+  gridV: { position: 'absolute', width: 2, height: MAP_SIZE, backgroundColor: 'rgba(0,0,0,0.05)' },
+  gridH: { position: 'absolute', height: 2, width: MAP_SIZE, backgroundColor: 'rgba(0,0,0,0.05)' },
+  playerWrapper: { position: 'absolute', left: width / 2 - 18, top: height / 2 - 18, zIndex: 10, alignItems: 'center' },
+  hud: { ...StyleSheet.absoluteFillObject, zIndex: 999, padding: 20, justifyContent: 'space-between' },
+  minimap: { alignSelf: 'flex-end', width: MINIMAP_SIZE, height: MINIMAP_SIZE, borderRadius: 10, borderWidth: 2, borderColor: '#FF6B1A', overflow: 'hidden' },
+  minimapBg: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
+  miniDot: { position: 'absolute', width: 8, height: 8, backgroundColor: '#FF6B1A', borderRadius: 4, zIndex: 100 },
+  loot: { position: 'absolute', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 20, padding: 8, alignItems: 'center', justifyContent: 'center' },
+  pickupBtn: { backgroundColor: '#FF6B1A', padding: 18, borderRadius: 15, flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'center', position: 'absolute', bottom: 120, shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 10, elevation: 10 },
+  pickupText: { color: 'white', fontWeight: '900', fontSize: 14 },
+  inventoryBar: { flexDirection: 'row', gap: 12, alignSelf: 'center', marginBottom: 20 },
+  invSlot: { width: 50, height: 50, backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 10, borderWidth: 1, borderColor: '#444', alignItems: 'center', justifyContent: 'center' },
   landmark: { position: 'absolute', alignItems: 'center' },
-  landmarkText: { color: 'white', fontWeight: 'bold', fontSize: 12 }, // FIXED: Added proper text style
-  storm: { position: 'absolute', borderWidth: 3, borderColor: '#3B82F6', backgroundColor: 'rgba(59, 130, 246, 0.1)' }
+  landmarkText: { color: 'white', fontWeight: 'bold', fontSize: 12, textShadowColor: 'black', textShadowRadius: 3, marginTop: 4 },
 });

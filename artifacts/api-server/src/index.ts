@@ -7,28 +7,52 @@ const port = Number(process.env["PORT"] || "5000");
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: "*" } });
 
-interface Player { x: number; y: number; username: string; }
-const players = new Map<string, Player>();
+interface Player { x: number; y: number; username: string; health: number; }
+interface Loot { id: string; x: number; y: number; type: string; name: string; }
 
-// Authoritative World Update (Tick Rate: 20Hz)
+const players = new Map<string, Player>();
+const lootDrops = new Map<string, Loot>();
+
+// --- SEED INITIAL LOOT ---
+for (let i = 0; i < 20; i++) {
+  const id = `loot_${i}`;
+  lootDrops.set(id, {
+    id,
+    x: 1000 + Math.random() * 3000,
+    y: 1000 + Math.random() * 3000,
+    type: Math.random() > 0.5 ? 'weapon' : 'armor',
+    name: Math.random() > 0.5 ? 'Oryx Rifle' : 'Kalahari Vest'
+  });
+}
+
+// Game Loop: 20Hz
 setInterval(() => {
-  if (players.size > 0) {
-    io.to("arena_1").emit("world_update", { 
-      players: Object.fromEntries(players),
-      storm: { x: 2500, y: 2500, radius: 2000 } // Initial Storm
-    });
-  }
+  io.to("arena_1").emit("world_update", { 
+    players: Object.fromEntries(players),
+    loot: Object.fromEntries(lootDrops),
+    storm: { x: 2500, y: 2500, radius: 2200 }
+  });
 }, 50);
 
 io.on("connection", (socket: Socket) => {
   socket.on("enter_arena", (data: { username: string }) => {
     socket.join("arena_1");
-    players.set(socket.id, { x: 2500, y: 2500, username: data.username || "Recruit" });
+    players.set(socket.id, { x: 2500, y: 2500, username: data.username || "Recruit", health: 100 });
   });
 
   socket.on("player_move", (data: { x: number, y: number }) => {
     const p = players.get(socket.id);
     if (p) { p.x = data.x; p.y = data.y; }
+  });
+
+  // --- NEW: LOOT PICKUP LOGIC ---
+  socket.on("pickup_loot", (lootId: string) => {
+    const item = lootDrops.get(lootId);
+    if (item) {
+      lootDrops.delete(lootId);
+      socket.emit("item_added", item);
+      logger.info({ user: socket.id, item: item.name }, "Player picked up loot");
+    }
   });
 
   socket.on("disconnect", () => {
@@ -37,4 +61,4 @@ io.on("connection", (socket: Socket) => {
   });
 });
 
-httpServer.listen(port, "0.0.0.0", () => logger.info({ port }, "SERVER LIVE"));
+httpServer.listen(port, "0.0.0.0", () => logger.info({ port }, "NAMIB COMBAT SERVER LIVE"));
