@@ -55,6 +55,40 @@ io.on("connection", (socket: Socket) => {
     }
   });
 
+  // --- UPDATED LOOT TABLE WITH RARITIES ---
+const RARITIES = [
+  { level: 'common', color: '#9CA3AF', weight: 50 },    // Grey
+  { level: 'uncommon', color: '#22C55E', weight: 25 },  // Green
+  { level: 'rare', color: '#3B82F6', weight: 15 },      // Blue
+  { level: 'epic', color: '#A855F7', weight: 7 },       // Purple
+  { level: 'legendary', color: '#F5A623', weight: 3 }   // Orange
+];
+
+function getRandomRarity() {
+  const roll = Math.random() * 100;
+  let cumulative = 0;
+  for (const r of RARITIES) {
+    cumulative += r.weight;
+    if (roll <= cumulative) return r;
+  }
+  return RARITIES[0];
+}
+
+// SEEDING THE WORLD
+for (let i = 0; i < 30; i++) {
+  const rarity = getRandomRarity();
+  const id = `loot_${i}`;
+  lootDrops.set(id, {
+    id,
+    x: Math.random() * 4000 + 500,
+    y: Math.random() * 4000 + 500,
+    type: 'weapon',
+    name: 'Oryx-7',
+    rarity: rarity.level,
+    color: rarity.color
+  });
+}
+
   socket.on("disconnect", () => {
     players.delete(socket.id);
     io.to("arena_1").emit("player_left", socket.id);
