@@ -3,7 +3,7 @@ import { View, Pressable, StyleSheet, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-export function BottomNav({ active }: { active: string }) {
+export function BottomNav({ active, insetBottom = 0 }: { active: string, insetBottom?: number }) {
   const router = useRouter();
   const NAV_ITEMS = [
     { key: 'lobby', label: 'Lobby', route: '/lobby', icon: 'crosshairs-gps' },
@@ -13,7 +13,7 @@ export function BottomNav({ active }: { active: string }) {
   ];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: insetBottom, height: 60 + insetBottom }]}>
       {NAV_ITEMS.map((item) => (
         <Pressable 
           key={item.key} 
@@ -30,6 +30,6 @@ export function BottomNav({ active }: { active: string }) {
 }
 
 const styles = StyleSheet.create({
-  container: { position: 'absolute', bottom: 0, width: '100%', flexDirection: 'row', height: 80, backgroundColor: '#06080F', borderTopWidth: 1, borderColor: '#1E2A3D', zIndex: 9999 },
+  container: { position: 'absolute', bottom: 0, width: '100%', flexDirection: 'row', backgroundColor: '#06080F', borderTopWidth: 1, borderColor: '#1E2A3D', zIndex: 9999 },
   item: { flex: 1, alignItems: 'center', justifyContent: 'center' }
 });

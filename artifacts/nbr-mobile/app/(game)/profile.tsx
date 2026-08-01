@@ -232,7 +232,7 @@ export default function ProfileScreen() {
         </View>
       </ScrollView>
 
-      <BottomNav active="profile" />
+      <BottomNav active="profile" insetBottom={insets.bottom} />
     </View>
   );
 }
