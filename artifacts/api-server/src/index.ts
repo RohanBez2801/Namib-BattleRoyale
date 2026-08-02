@@ -2,6 +2,9 @@ import { createServer } from "http";
 import { Server, Socket } from "socket.io";
 import app from "./app";
 import { logger } from "./lib/logger";
+import { eq, sql } from "drizzle-orm";
+import { db } from "@workspace/db";
+import { playerStatsTable } from "@workspace/db/schema";
 
 /**
  * ============================================================
@@ -72,6 +75,8 @@ const RARITIES = [
 const players = new Map<string, any>();
 const lootDrops = new Map<string, any>();
 const deathBoxes = new Map<string, any>();
+const BOT_COUNT = 19;
+const bots = new Map<string, any>();
 
 let match = {
   phase: 'WAITING',
@@ -136,7 +141,44 @@ function handleDamage(victim: any, dmg: number, attacker?: any) {
 // ============================================================
 // 4. THE AUTHORITATIVE HEARTBEAT (20Hz)
 // ============================================================
+function spawnBots() {
+  for (let i = 0; i < BOT_COUNT; i++) {
+    const id = `bot_${i}`;
+    const weapon = WEAPONS[Math.floor(Math.random() * WEAPONS.length)];
+    const rarity = RARITIES[Math.floor(Math.random() * 4)];
+    bots.set(id, {
+      id,
+      username: `Ghost_Tracker_${i}`,
+      x: Math.random() * MAP_SIZE,
+      y: Math.random() * MAP_SIZE,
+      health: 100,
+      shield: 0,
+      overshield: 50,
+      alive: true,
+      heading: Math.random() * 360,
+      inventory: [{ type: 'weapon', weaponId: weapon.id, name: weapon.name, rarity: rarity.level, color: rarity.color }, null, null, null, null],
+      lastFireTime: 0,
+      targetX: 2500,
+      targetY: 2500,
+      isBot: true
+    });
+  }
+  logger.info({ count: bots.size }, "SERVER: Kalahari Ghost Bots Initialized");
+}
+
+async function recordVictoryToDB(username: string, userId: string) {
+  try {
+    await db.update(playerStatsTable)
+      .set({ wins: sql`${playerStatsTable.wins} + 1` })
+      .where(eq(playerStatsTable.profileId, userId));
+    logger.info({ user: username }, "DATABASE: Victory Recorded");
+  } catch (err) {
+    logger.error({ err }, "DATABASE: Failed to record win");
+  }
+}
+
 seedLoot();
+spawnBots();
 setInterval(() => {
   const now = Date.now();
   if (match.phase === 'ACTIVE') {
@@ -164,15 +206,42 @@ setInterval(() => {
       }
     });
 
-    const alive = Array.from(players.values()).filter(p => p.alive);
-    if (alive.length === 1 && players.size > 1) {
+    bots.forEach(bot => {
+      if (!bot.alive) return;
+
+      const dx = match.stormX - bot.x;
+      const dy = match.stormY - bot.y;
+      const angle = Math.atan2(dy, dx);
+      
+      bot.x += Math.cos(angle) * 1.5;
+      bot.y += Math.sin(angle) * 1.5;
+      bot.heading = angle * (180 / Math.PI) + 90;
+
+      if (dist(bot.x, bot.y, match.stormX, match.stormY) > match.stormRadius) handleDamage(bot, sp.dps / 20);
+
+      players.forEach(p => {
+         if (p.alive && dist(bot.x, bot.y, p.x, p.y) < 400) {
+            if (now - bot.lastFireTime > 1000) {
+               handleDamage(p, 10, bot);
+               bot.lastFireTime = now;
+            }
+         }
+      });
+    });
+
+    const alivePlayers = Array.from(players.values()).filter(p => p.alive);
+    const aliveBots = Array.from(bots.values()).filter(b => b.alive);
+    if (alivePlayers.length === 1 && aliveBots.length === 0 && (players.size + bots.size) > 1) {
        match.phase = 'FINISHED';
-       io.to("arena_1").emit("victory", { winner: alive[0].username });
-       setTimeout(() => { match.phase = 'WAITING'; players.clear(); seedLoot(); }, MATCH_RESET_DELAY);
+       const winner = alivePlayers[0];
+       io.to("arena_1").emit("victory", { winner: winner.username });
+       recordVictoryToDB(winner.username, winner.dbId || winner.id);
+       setTimeout(() => { match.phase = 'WAITING'; players.clear(); bots.clear(); seedLoot(); spawnBots(); }, MATCH_RESET_DELAY);
     }
   }
 
-  io.to("arena_1").emit("world_update", { players: Object.fromEntries(players), loot: Object.fromEntries(lootDrops), boxes: Object.fromEntries(deathBoxes), storm: match });
+  const allPlayers = { ...Object.fromEntries(players), ...Object.fromEntries(bots) };
+  io.to("arena_1").emit("world_update", { players: allPlayers, loot: Object.fromEntries(lootDrops), boxes: Object.fromEntries(deathBoxes), storm: match });
 }, TICK_RATE);
 
 // ============================================================
@@ -190,9 +259,9 @@ io.on("connection", (socket: Socket) => {
     logger.info({ id: socket.id, os: data.platform }, "Net: Handshake Verified");
   });
 
-  socket.on("enter_arena", (data: { username: string }) => {
+  socket.on("enter_arena", (data: { username: string, userId?: string }) => {
     socket.join("arena_1");
-    players.set(socket.id, { id: socket.id, username: data.username || "Recruit", x: 2500, y: 2500, health: 100, shield: 0, overshield: 50, alive: true, inventory: Array(5).fill(null), equipped: 0, lastDamageTime: 0, lastFireTime: 0, heading: 0, channeling: null });
+    players.set(socket.id, { id: socket.id, dbId: data.userId || socket.id, username: data.username || "Recruit", x: 2500, y: 2500, health: 100, shield: 0, overshield: 50, alive: true, inventory: Array(5).fill(null), equipped: 0, lastDamageTime: 0, lastFireTime: 0, heading: 0, channeling: null });
     if (match.phase === 'WAITING' && players.size >= 1) { match.phase = 'ACTIVE'; match.startTime = Date.now(); }
     logger.info({ user: data.username }, "Player Deployed");
   });
@@ -210,6 +279,12 @@ io.on("connection", (socket: Socket) => {
       if (vid !== socket.id && v.alive && dist(v.x, v.y, data.tx, data.ty) < 45) {
         handleDamage(v, 22, p);
         io.to("arena_1").emit("hit", { id: vid, x: v.x, y: v.y });
+      }
+    });
+    bots.forEach((b, bid) => {
+      if (b.alive && dist(b.x, b.y, data.tx, data.ty) < 45) {
+        handleDamage(b, 22, p);
+        io.to("arena_1").emit("hit", { id: bid, x: b.x, y: b.y });
       }
     });
   });
