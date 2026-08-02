@@ -9,3 +9,19 @@ Wep_Kalahari_Bow_Obsidian
 [ENVIRONMENT]
 Env_Sossusvlei_Dunes
 Env_Skeleton_Coast_Wreck
+
+[ENGINE_SETTINGS]
+Target_TickRate: 20Hz
+Physics_Model: Simple_Collision_ZeroBuild
+Network_Mode: Client_Authoritative_Proxy
+
+[UI_REQUIREMENTS]
+UMG_Main_Lobby: 1:1 Fortnite Replication
+UMG_Minimap: Dynamic_Vector_Overlay
+UMG_KillFeed: Top_Right_Vertical_Stack
+
+[VFX_TRIGGERS]
+FX_Storm_Wall: Blue_Wall_Lumen
+FX_Shield_Crack: Blue_Hexagon_Particle
+FX_Overshield_Pulse: Cyan_Aura
+FX_Mythic_Beacon: Gold_Sky_Beam
