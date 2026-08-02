@@ -30,4 +30,16 @@ router.get("/profile", authMiddleware, async (req: AuthRequest, res) => {
   return res.status(201).json({ profile: newProfile, stats: newStats });
 });
 
+router.get("/pc-sync", authMiddleware, async (req: AuthRequest, res) => {
+  const userId = req.user!.id;
+  const profile = await db.query.profilesTable.findFirst({ 
+    where: eq(profilesTable.supabaseId, userId) });
+
+  return res.json({
+    ...profile,
+    engine_target: "UE5_CPP",
+    server_region: "Namibia_North"
+  })
+});
+
 export default router;

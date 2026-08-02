@@ -1,0 +1,11 @@
+[CHARACTERS]
+SK_Himba_Guardian_Tactical
+SK_Herero_Sentinel_Red
+
+[WEAPONS]
+Wep_Oryx7_Gold_Mythic
+Wep_Kalahari_Bow_Obsidian
+
+[ENVIRONMENT]
+Env_Sossusvlei_Dunes
+Env_Skeleton_Coast_Wreck

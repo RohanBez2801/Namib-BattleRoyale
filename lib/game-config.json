@@ -1,0 +1,39 @@
+{
+    "version": "1.0.0",
+    "map_size": 5000,
+    "tick_rate_ms": 50,
+    "weapons": {
+        "oryx_striker": {
+            "base_dmg": 27,
+            "fire_rate": 200,
+            "rarity_mult": 1.1
+        },
+        "skeleton_coast": {
+            "base_dmg": 95,
+            "fire_rate": 1500,
+            "rarity_mult": 1.3
+        }
+    },
+    "storm_phases": [
+        {
+            "radius": 2000,
+            "dps": 1,
+            "wait": 60
+        },
+        {
+            "radius": 1500,
+            "dps": 2,
+            "wait": 45
+        }
+    ],
+
+    "locker_manifest": {
+    "skins": [
+      { "id": "himba_guardian", "mesh": "SkeletalMesh'/Game/Characters/Himba/SK_Himba_G.SK_Himba_G'" },
+      { "id": "herero_sentinel", "mesh": "SkeletalMesh'/Game/Characters/Herero/SK_Herero_S.SK_Herero_S'" }
+    ],
+    "emotes": [
+      { "id": "namib_dance_1", "anim": "AnimSequence'/Game/Anims/Emotes/Dance_Namib.Dance_Namib'" }
+    ]
+  }
+}
