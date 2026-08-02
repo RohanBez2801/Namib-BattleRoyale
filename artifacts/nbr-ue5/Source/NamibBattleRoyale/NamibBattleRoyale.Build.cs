@@ -6,17 +6,18 @@ public class NamibBattleRoyale : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
+        // The "Fortnite" Module Set
 		PublicDependencyModuleNames.AddRange(new string[] { 
-			"Core", 
-			"CoreUObject", 
-			"Engine", 
-			"InputCore", 
-			"EnhancedInput", 
-			"Http", 
-			"Json", 
-			"JsonUtilities", 
-			"UMG", 
-			"CommonUI" 
-		});
+            "Core", 
+            "CoreUObject", 
+            "Engine", 
+            "InputCore", 
+            "EnhancedInput", 
+            "Http", 
+            "Json", 
+            "JsonUtilities", 
+            "UMG", 
+            "CommonUI" 
+        });
 	}
 }
